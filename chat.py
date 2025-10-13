@@ -1,124 +1,163 @@
+# gui_chat.py — простой GUI для общения с вашим QA‑ботом на основе intests.json / words.pkl / classes.pkl / qa_model.h5
+# Требования: pip install tensorflow keras nltk numpy pillow
+
+import json
+import random
+import threading
+import tkinter as tk
+from tkinter import filedialog, messagebox
+from tkinter.scrolledtext import ScrolledText
+
+import numpy as np
+import pickle
+import os
+
+# --- NLP подготовка (совместима с вашим train_bot.py) ---
 import nltk
 from nltk.stem import WordNetLemmatizer
 lemmatizer = WordNetLemmatizer()
-import pickle
-import numpy as np
-import re
 
+# Убедимся, что нужные токенайзеры есть
+try:
+    nltk.data.find('tokenizers/punkt')
+except LookupError:
+    nltk.download('punkt')
+try:
+    nltk.data.find('corpora/wordnet')
+except LookupError:
+    nltk.download('wordnet')
+
+# --- Модель ---
 from keras.models import load_model
-model = load_model('chatbot_model_v2.h5')
-import json
-import random
-intents = json.loads(open('intents.json').read())
-words = pickle.load(open('words_v2.pkl','rb'))
-classes = pickle.load(open('classes_v2.pkl','rb'))
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-def clean_up_sentence(sentence):
-    # tokenize the pattern - split words into array
+INTENTS_PATH = os.path.join(BASE_DIR, 'intents.json')
+WORDS_PATH = os.path.join(BASE_DIR, 'words.pkl')
+CLASSES_PATH = os.path.join(BASE_DIR, 'classes.pkl')
+MODEL_PATH = os.path.join(BASE_DIR, 'qa_model.h5')
+
+with open(INTENTS_PATH, 'r', encoding='utf-8') as f:
+    intents = json.load(f)
+
+words = pickle.load(open(WORDS_PATH, 'rb'))
+classes = pickle.load(open(CLASSES_PATH, 'rb'))
+model = load_model(MODEL_PATH)
+
+# --- Вспомогательные функции из классического BoW‑бота ---
+
+def clean_up_sentence(sentence: str):
     sentence_words = nltk.word_tokenize(sentence)
-    # stem each word - create short form for word
     sentence_words = [lemmatizer.lemmatize(word.lower()) for word in sentence_words]
     return sentence_words
 
-# return bag of words array: 0 or 1 for each word in the bag that exists in the sentence
 
-def bow(sentence, words, show_details=True):
-    # tokenize the pattern
+def bow(sentence: str, words_vocab):
     sentence_words = clean_up_sentence(sentence)
-    # bag of words - matrix of N words, vocabulary matrix
-    bag = [0]*len(words)  
+    bag = [0] * len(words_vocab)
     for s in sentence_words:
-        for i,w in enumerate(words):
-            if w == s: 
-                # assign 1 if current word is in the vocabulary position
+        for i, w in enumerate(words_vocab):
+            if w == s:
                 bag[i] = 1
-                if show_details:
-                    print ("found in bag: %s" % w)
-    return(np.array(bag))
+    return np.array(bag)
 
-def predict_class(sentence, model):
-    # filter out predictions below a threshold
-    p = bow(sentence, words,show_details=False)
-    res = model.predict(np.array([p]))[0]
-    ERROR_THRESHOLD = 0.25
-    results = [[i,r] for i,r in enumerate(res) if r>ERROR_THRESHOLD]
-    # sort by strength of probability
+
+def predict_class(sentence: str, model_, error_threshold: float = 0.25):
+    p = bow(sentence, words)
+    res = model_.predict(np.array([p]), verbose=0)[0]
+    results = [[i, r] for i, r in enumerate(res) if r > error_threshold]
     results.sort(key=lambda x: x[1], reverse=True)
     return_list = []
     for r in results:
         return_list.append({"intent": classes[r[0]], "probability": str(r[1])})
     return return_list
 
-def getResponse(ints, intents_json):
-    tag = ints[0]['intent']
-    list_of_intents = intents_json['intents']
-    for i in list_of_intents:
-        if(i['tag']== tag):
-            result = random.choice(i['responses'])
-            break
-    return result
 
-def chatbot_response(msg):
-    ints = predict_class(msg, model)
-    res = getResponse(ints, intents)
-    return res
+def get_response(intents_list, intents_json):
+    if not intents_list:
+        return "Извини, я не понял вопрос. Уточни, пожалуйста."
+    tag = intents_list[0]['intent']
+    for i in intents_json['intents']:
+        if i['tag'] == tag:
+            return random.choice(i.get('responses', ["Уточни, пожалуйста."]))
+    return "Извини, не нашёл подходящий ответ."
 
 
-#Creating GUI with tkinter
-import tkinter
-from tkinter import *
-import webbrowser
+# --- GUI ---
+class ChatGUI(tk.Tk):
+    def __init__(self):
+        super().__init__()
+        self.title('QA Bot — Чат')
+        self.geometry('720x560')
 
-def openweb():
-    webbrowser.open(url,new=new)
+        # История
+        self.chat = ScrolledText(self, wrap=tk.WORD, state=tk.DISABLED, font=('Segoe UI', 11))
+        self.chat.pack(fill=tk.BOTH, expand=True, padx=10, pady=(10, 6))
 
-def send():
-    msg = EntryBox.get("1.0",'end-1c').strip()
-    EntryBox.delete("0.0",END)
+        # Нижняя панель
+        bottom = tk.Frame(self)
+        bottom.pack(fill=tk.X, padx=10, pady=(0, 10))
 
-    if msg != '':
-        ChatLog.config(state=NORMAL)
-        ChatLog.insert(END, "You: " + msg + '\n\n')
-        ChatLog.config(foreground="#442265", font=("Verdana", 12 ))
-        res = chatbot_response(msg)
-        if 'href' in res:
-        	links = re. findall("href=[\"\'](.*?)[\"\']", res)[0]
-        	ChatLog.insert(END, "Bot: " + 	links +'\n\n')
-        else:
-        	ChatLog.insert(END, "Bot: " + res + '\n\n')
-        ChatLog.config(state=DISABLED)
-        ChatLog.yview(END)
- 
+        self.input_var = tk.StringVar()
+        self.entry = tk.Entry(bottom, textvariable=self.input_var, font=('Segoe UI', 11))
+        self.entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        self.entry.bind('<Return>', self.on_send)
 
-base = Tk()
-base.title("PVPPCOE ASSISTANT")
-base.geometry("400x500")
-base.resizable(width=FALSE, height=FALSE)
+        self.send_btn = tk.Button(bottom, text='Отправить', command=self.on_send)
+        self.send_btn.pack(side=tk.LEFT, padx=8)
 
-#Create Chat window
-ChatLog = Text(base, bd=0, bg="white", height="8", width="50", font="Arial",)
+        self.clear_btn = tk.Button(bottom, text='Очистить', command=self.clear_chat)
+        self.clear_btn.pack(side=tk.LEFT)
 
-ChatLog.config(state=DISABLED)
+        menubar = tk.Menu(self)
+        file_menu = tk.Menu(menubar, tearoff=0)
+        file_menu.add_command(label='Сохранить диалог…', command=self.save_transcript)
+        file_menu.add_separator()
+        file_menu.add_command(label='Выход', command=self.destroy)
+        menubar.add_cascade(label='Файл', menu=file_menu)
+        self.config(menu=menubar)
 
-#Bind scrollbar to Chat window
-scrollbar = Scrollbar(base, command=ChatLog.yview, cursor="heart")
-ChatLog['yscrollcommand'] = scrollbar.set
+        self._append('Бот', 'Привет! Я готов отвечать на вопросы по базе знаний.')
+        self.entry.focus_set()
 
-#Create Button to send message
-SendButton = Button(base, font=("Verdana",12,'bold'), text="Send", width="12", height=5,
-                    bd=0, bg="#32de97", activebackground="#3c9d9b",fg='#ffffff',
-                    command= send )
+    def _append(self, who: str, text: str):
+        self.chat.configure(state=tk.NORMAL)
+        self.chat.insert(tk.END, f"{who}: {text}\n")
+        self.chat.configure(state=tk.DISABLED)
+        self.chat.see(tk.END)
 
-#Create the box to enter message
-EntryBox = Text(base, bd=0, bg="white",width="29", height="5", font="Arial")	
-#EntryBox.bind("<Return>", send)
+    def clear_chat(self):
+        self.chat.configure(state=tk.NORMAL)
+        self.chat.delete('1.0', tk.END)
+        self.chat.configure(state=tk.DISABLED)
+
+    def save_transcript(self):
+        content = self.chat.get('1.0', tk.END)
+        path = filedialog.asksaveasfilename(defaultextension='.txt', filetypes=[('Text', '*.txt')])
+        if path:
+            with open(path, 'w', encoding='utf-8') as f:
+                f.write(content)
+            messagebox.showinfo('Сохранено', f'Диалог сохранён в:\n{path}')
+
+    def on_send(self, event=None):
+        text = self.input_var.get().strip()
+        if not text:
+            return
+        self.input_var.set('')
+        self._append('Вы', text)
+
+        # Не блокируем UI — отвечаем в отдельном потоке
+        threading.Thread(target=self._bot_reply, args=(text,), daemon=True).start()
+
+    def _bot_reply(self, text: str):
+        try:
+            intents_list = predict_class(text, model)
+            reply = get_response(intents_list, intents)
+        except Exception as e:
+            reply = f"Ошибка обработки вопроса: {e}"
+        self._append('Бот', reply)
 
 
-#Place all components on the screen
-scrollbar.place(x=376,y=6, height=386)
-ChatLog.place(x=6,y=6, height=386, width=370)
-EntryBox.place(x=128, y=401, height=90, width=265)
-SendButton.place(x=6, y=401, height=90)
-
-base.mainloop()
+if __name__ == '__main__':
+    app = ChatGUI()
+    app.mainloop()
