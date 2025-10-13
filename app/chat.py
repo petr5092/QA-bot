@@ -32,17 +32,40 @@ from keras.models import load_model
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-INTENTS_PATH = os.path.join(BASE_DIR, 'intents.json')
-WORDS_PATH = os.path.join(BASE_DIR, 'words.pkl')
-CLASSES_PATH = os.path.join(BASE_DIR, 'classes.pkl')
-MODEL_PATH = os.path.join(BASE_DIR, 'qa_model.h5')
+FILES_DIR = os.path.join(BASE_DIR, 'files')
+INTENTS_PATH = os.path.join(FILES_DIR, 'intents.json')
+WORDS_PATH = os.path.join(FILES_DIR, 'words.pkl')
+CLASSES_PATH = os.path.join(FILES_DIR, 'classes.pkl')
+MODEL_PATH = os.path.join(FILES_DIR, 'qa_model.h5')
 
-with open(INTENTS_PATH, 'r', encoding='utf-8') as f:
-    intents = json.load(f)
+# Ensure files directory exists (the program can still run without all files present)
+if not os.path.isdir(FILES_DIR):
+    os.makedirs(FILES_DIR, exist_ok=True)
 
-words = pickle.load(open(WORDS_PATH, 'rb'))
-classes = pickle.load(open(CLASSES_PATH, 'rb'))
-model = load_model(MODEL_PATH)
+intents = {}
+if os.path.exists(INTENTS_PATH):
+    with open(INTENTS_PATH, 'r', encoding='utf-8') as f:
+        intents = json.load(f)
+else:
+    print(f"Warning: {INTENTS_PATH} not found. intents will be empty.")
+
+try:
+    words = pickle.load(open(WORDS_PATH, 'rb'))
+except Exception:
+    words = []
+    print(f"Warning: {WORDS_PATH} not found or failed to load.")
+
+try:
+    classes = pickle.load(open(CLASSES_PATH, 'rb'))
+except Exception:
+    classes = []
+    print(f"Warning: {CLASSES_PATH} not found or failed to load.")
+
+try:
+    model = load_model(MODEL_PATH)
+except Exception:
+    model = None
+    print(f"Warning: {MODEL_PATH} not found or failed to load. Predict will not work.")
 
 # --- Вспомогательные функции из классического BoW‑бота ---
 

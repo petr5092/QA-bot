@@ -10,6 +10,7 @@ from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.utils import to_categorical
 import random
 from tensorflow.keras.models import load_model
+import os
 
 
 def create_bag_of_words(documents, words):
@@ -22,7 +23,7 @@ def create_bag_of_words(documents, words):
 
 
 
-with open('intents.json', 'r', encoding='utf-8') as file:
+with open(os.path.join('files', 'intents.json'), 'r', encoding='utf-8') as file:
     intents = json.load(file)
 lemmatizer = WordNetLemmatizer()
 words = []
@@ -39,8 +40,9 @@ for intent in intents['intents']:
 words = [lemmatizer.lemmatize(w.lower()) for w in words if w not in ignore_words]
 words = sorted(list(set(words)))
 classes = sorted(list(set(classes)))
-pickle.dump(words, open("words.pkl", "wb"))
-pickle.dump(classes, open("classes.pkl", "wb"))
+os.makedirs('files', exist_ok=True)
+pickle.dump(words, open(os.path.join('files', "words.pkl"), "wb"))
+pickle.dump(classes, open(os.path.join('files', "classes.pkl"), "wb"))
 training_sentences = []
 training_labels = []
 for doc in documents:
@@ -59,4 +61,4 @@ model.add(Dropout(0.5))
 model.add(Dense(len(classes), activation='softmax'))
 model.compile(loss='categorical_crossentropy', optimizer=Adam(learning_rate=0.01), metrics=['accuracy'])
 model.fit(training_bag, training_labels, epochs=200, batch_size=5, verbose=1)
-model.save("qa_model.h5")
+model.save(os.path.join('files', "qa_model.h5"))
