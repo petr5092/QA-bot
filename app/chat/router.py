@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Body, Query
 from chat.schemas import ChatRequest
 from typing import Optional
 import json
@@ -104,7 +104,8 @@ def fallback_pattern_match(question: str) -> Optional[str]:
 
 
 @router.post("/ask")
-async def ask_question(question: str):
+async def ask_question(body: Optional[ChatRequest] = Body(None), question: Optional[str] = Query(None)):
+    question = (body.question if body else None) or question
     if not question or not question.strip():
         raise HTTPException(status_code=400, detail="Параметр 'question' не должен быть пустым")
     try:
