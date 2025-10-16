@@ -7,6 +7,7 @@ app = FastAPI()
 
 # Serve static assets under /static to avoid intercepting API routes
 app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/files", StaticFiles(directory="files"), name="files")
 
 @app.get("/")
 def root():

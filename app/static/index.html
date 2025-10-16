@@ -3,20 +3,28 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>QA Bot — Чат</title>
+  <title>Капелька</title>
   <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
   <div id="app">
     <header>
-      <h1>QA Bot</h1>
+      <h1>Капелька</h1>
     </header>
     <main>
-      <div id="chat-log"></div>
-      <form id="chat-form">
-        <input id="question" autocomplete="off" placeholder="Спросите бота..." />
-        <button type="submit">Отправить</button>
-      </form>
+      <div class="layout">
+        <aside id="model-panel">
+          <div class="model-header"></div>
+          <div id="model-content">Здесь будут показываться видео/модель при определённых условиях.</div>
+        </aside>
+        <section id="chat-area">
+          <div id="chat-log"></div>
+          <form id="chat-form">
+            <input id="question" autocomplete="off" placeholder="Спросите Капельку..." />
+            <button type="submit">Отправить</button>
+          </form>
+        </section>
+      </div>
     </main>
   </div>
   <script src="/static/app.js"></script>
