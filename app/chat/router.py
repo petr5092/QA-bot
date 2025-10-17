@@ -16,7 +16,7 @@ router = APIRouter(
 )
 
 
-# Paths
+
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FILES_DIR = os.path.join(BASE_DIR, 'files')
 INTENTS_PATH = os.path.join(FILES_DIR, 'intents.json')
@@ -28,7 +28,7 @@ MODEL_PATH = os.path.join(FILES_DIR, 'qa_model.h5')
 lemmatizer = WordNetLemmatizer()
 
 
-# Load intents, vocab and model (best-effort)
+
 intents = {}
 if os.path.exists(INTENTS_PATH):
     with open(INTENTS_PATH, 'r', encoding='utf-8') as f:
